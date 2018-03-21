@@ -232,6 +232,9 @@ public class VideoDetailsFragment extends DetailsFragment {
                 } else if (action.getId() == ACTION_WATCH_REFRESH) {
                     Logger.i("被点击了", "======>" + action.getLabel1());
                     if (list == null || list.size() <= 0) {
+                        Toast.makeText(getActivity(),"刷新剧集中...",Toast.LENGTH_SHORT).show();
+                        Log.d(TAG, "刷新剧集中...11111111111");
+
                         getVideoDetials();
                     }
                 } else {
@@ -280,7 +283,7 @@ public class VideoDetailsFragment extends DetailsFragment {
             public void run() {
                 try {
                     String url = mSelectedMovie.getVideoUrl();
-                    Document doc = Jsoup.connect(url).get();
+                    Document doc = Jsoups.connect(url);
                     Logger.i(doc.toString());
                     Elements elements = doc.select("div.tv-info-list").select("ul.clearfix");
                     list = new ArrayList<>();
@@ -444,6 +447,13 @@ public class VideoDetailsFragment extends DetailsFragment {
                             break;
                     }
 
+                }
+                if(item.toString().equals("刷新")){
+                    if (list == null || list.size() <= 0) {
+                        Log.d(TAG, "刷新剧集中...22222222222");
+                        Toast.makeText(getActivity(),"刷新剧集中...",Toast.LENGTH_SHORT).show();
+                        getVideoDetials();
+                    }
                 }
 
 

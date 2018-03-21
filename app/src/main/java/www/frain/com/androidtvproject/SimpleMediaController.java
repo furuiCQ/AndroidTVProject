@@ -8,6 +8,7 @@ import com.baidu.cloud.videoplayer.widget.BDCloudVideoView.PlayerState;
 
 import android.app.Activity;
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
@@ -116,27 +117,28 @@ public class SimpleMediaController extends RelativeLayout {
             }
         });
         enableControllerBar(false);
-
     }
+
 
 
     public void rightDragSeekBar(){
-        int progess=seekBar.getProgress();
-        if(progess<seekBar.getMax()-seekBar.getMax()/100){
-            progess=seekBar.getProgress()+seekBar.getMax()/100;
-            seekBar.setProgress(progess);
-            mVideoView.seekTo(progess);
-
-        }
+        int pos = mVideoView.getCurrentPosition();
+        pos += 15000; // milliseconds
+        mVideoView.seekTo(pos);
+        seekBar.setProgress(pos);
     }
     public void leftDragSeekBar(){
-        int progess=seekBar.getProgress();
-        if(progess>seekBar.getMax()/100){
-            progess=seekBar.getProgress()-seekBar.getMax()/100;
-            seekBar.setProgress(progess);
-            mVideoView.seekTo(progess);
-        }
+        int pos = mVideoView.getCurrentPosition();
+        pos -= 5000; // milliseconds
+        mVideoView.seekTo(pos);
+        seekBar.setProgress(pos);
     }
+    public void setSeekBarProgress(int pos){
+        mVideoView.seekTo(pos);
+        seekBar.setProgress(pos);
+        mVideoView.start();
+    }
+
     /**
      *
      */

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">AndroidTVProject</string>
+    <string name="app_name">韩剧TV</string>
     <string name="browse_title"><![CDATA[Videos by Your Company]]></string>
     <string name="related_movies">Related Videos</string>
     <string name="grid_view">Grid View</string>

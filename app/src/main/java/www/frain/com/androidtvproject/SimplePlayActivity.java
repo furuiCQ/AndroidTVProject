@@ -10,6 +10,7 @@ import com.baidu.cloud.videoplayer.widget.BDCloudVideoView.PlayerState;
 
 import android.app.Activity;
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
@@ -29,7 +30,7 @@ public class SimplePlayActivity extends Activity implements IMediaPlayer.OnPrepa
      */
     private String ak = "e22b1c53c8c44b9ebf0c7fb054acb353"; // 请录入您的AK !!!
 
-   // private VideoInfo info;
+    // private VideoInfo info;
     String url;
     private BDCloudVideoView mVV = null;
     private SimpleMediaController mediaController = null;
@@ -72,7 +73,7 @@ public class SimplePlayActivity extends Activity implements IMediaPlayer.OnPrepa
         } else {
             mVV.setVideoScalingMode(BDCloudVideoView.VIDEO_SCALING_MODE_SCALE_TO_FIT);
         }
-        
+
         RelativeLayout.LayoutParams rllp = new RelativeLayout.LayoutParams(-1, -1);
         rllp.addRule(RelativeLayout.CENTER_IN_PARENT);
         mViewHolder.addView(mVV, rllp);
@@ -89,7 +90,19 @@ public class SimplePlayActivity extends Activity implements IMediaPlayer.OnPrepa
 
         mediaController.setMediaPlayerControl(mVV);
 
+        //mVV.start();
+        initRecord();
+    }
+
+    void initRecord() {
+        MySqliteHelper mySqliteHelper = new MySqliteHelper(this);
+        SQLiteDatabase database = mySqliteHelper.getWritableDatabase();
+        if (mySqliteHelper.query(database, url)) {
+            Log.d(TAG, "initRecord:=====>" + mySqliteHelper.queryTime(database,url));
+            mVV.setInitPlayPosition(mySqliteHelper.queryTime(database,url));
+        }
         mVV.start();
+
     }
 
     @Override
@@ -129,6 +142,13 @@ public class SimplePlayActivity extends Activity implements IMediaPlayer.OnPrepa
     protected void onDestroy() {
         super.onDestroy();
         if (mVV != null) {
+            MySqliteHelper mySqliteHelper = new MySqliteHelper(this);
+            SQLiteDatabase database = mySqliteHelper.getWritableDatabase();
+            if (mySqliteHelper.query(database, url)) {
+                mySqliteHelper.update(database, url, "" + mVV.getCurrentPosition());
+            } else {
+                mySqliteHelper.insert(database, url, "" + mVV.getCurrentPosition());
+            }
             mVV.stopPlayback();
         }
         Log.v(TAG, "onDestroy");
@@ -136,7 +156,7 @@ public class SimplePlayActivity extends Activity implements IMediaPlayer.OnPrepa
 
     /**
      * 检测'点击'空白区的事件，若播放控制控件未显示，设置为显示，否则隐藏。
-     * 
+     *
      * @param v
      */
     public void onClickEmptyArea(View v) {
@@ -189,7 +209,7 @@ public class SimplePlayActivity extends Activity implements IMediaPlayer.OnPrepa
     @Override
     public boolean onError(IMediaPlayer mp, int what, int extra) {
         // restart player?
-        
+
         return false;
     }
 
@@ -207,13 +227,14 @@ public class SimplePlayActivity extends Activity implements IMediaPlayer.OnPrepa
             mediaController.onTotalCacheUpdate(percent * mVV.getDuration() / 100);
         }
     }
-    
+
     @Override
     public void onPlayerStateChanged(PlayerState nowState) {
         if (mediaController != null) {
             mediaController.changeState();
         }
     }
+
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         switch (keyCode) {
@@ -222,24 +243,24 @@ public class SimplePlayActivity extends Activity implements IMediaPlayer.OnPrepa
 
                 break;
             case KeyEvent.KEYCODE_DPAD_CENTER:
-                if(mVV.isPlaying()){
+                if (mVV.isPlaying()) {
                     mVV.pause();
-                }else{
+                } else {
                     mVV.start();
                 }
                 break;
 
             case KeyEvent.KEYCODE_DPAD_DOWN:
-              //  Toast("你按下下方向键");
+                //  Toast("你按下下方向键");
                 break;
 
             case KeyEvent.KEYCODE_DPAD_LEFT:
-               // Toast("你按下左方向键");
+                // Toast("你按下左方向键");
                 mediaController.leftDragSeekBar();
                 break;
 
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-               // Toast("你按下右方向键");
+                // Toast("你按下右方向键");
                 mediaController.rightDragSeekBar();
                 break;
 

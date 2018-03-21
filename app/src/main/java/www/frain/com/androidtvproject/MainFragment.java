@@ -111,7 +111,7 @@ public class MainFragment extends BrowseFragment {
             @Override
             public void run() {
                 try {
-                    Document doc = Jsoup.connect("https://www.hanjutv.com/hanju/index.html").get();
+                    Document doc = Jsoups.connect("https://www.hanjutv.com/hanju/index.html");
                     Elements titleLinks = doc.select("li.video-item");
                     hjlist = MovieList.setupMovies(titleLinks, "https://www.hanjutv.com");
                     handler.sendEmptyMessage(0);
@@ -130,7 +130,7 @@ public class MainFragment extends BrowseFragment {
             @Override
             public void run() {
                 try {
-                    Document doc = Jsoup.connect("http://www.ttmeiju.vip/").get();
+                    Document doc = Jsoups.connect("http://www.ttmeiju.vip/");
                     Elements element = doc.select("div.divfirst");
                     Elements uls=element.get(0).select("ul.whlist").select("li");
                     mjlist = MovieList.setupMJMovies(uls, "http://www.ttmeiju.vip");
@@ -247,6 +247,7 @@ public class MainFragment extends BrowseFragment {
             if(hjlist==null||hjlist.size()<=0){
                 loadVideo();
             }
+            Toast.makeText(getActivity(),"正在刷新...",Toast.LENGTH_SHORT).show();
             }
         });
 
