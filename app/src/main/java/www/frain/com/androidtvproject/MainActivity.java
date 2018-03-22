@@ -17,6 +17,9 @@ package www.frain.com.androidtvproject;
 import android.app.Activity;
 import android.os.Bundle;
 
+import com.orhanobut.logger.AndroidLogAdapter;
+import com.orhanobut.logger.Logger;
+
 /*
  * MainActivity class that loads {@link MainFragment}.
  */
@@ -26,6 +29,7 @@ public class MainActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Logger.addLogAdapter(new AndroidLogAdapter());
 
     }
 }

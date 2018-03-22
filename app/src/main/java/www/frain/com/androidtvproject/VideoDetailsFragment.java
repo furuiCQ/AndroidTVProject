@@ -14,15 +14,18 @@
 
 package www.frain.com.androidtvproject;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v17.leanback.app.DetailsFragment;
 import android.support.v17.leanback.app.DetailsFragmentBackgroundController;
+import android.support.v17.leanback.app.ProgressBarManager;
 import android.support.v17.leanback.widget.Action;
 import android.support.v17.leanback.widget.ArrayObjectAdapter;
 import android.support.v17.leanback.widget.ClassPresenterSelector;
@@ -40,6 +43,7 @@ import android.support.v17.leanback.widget.Row;
 import android.support.v17.leanback.widget.RowPresenter;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.widget.ContentLoadingProgressBar;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.ViewGroup;
@@ -52,6 +56,7 @@ import com.bumptech.glide.request.animation.GlideAnimation;
 import com.bumptech.glide.request.target.SimpleTarget;
 import com.orhanobut.logger.Logger;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -226,17 +231,23 @@ public class VideoDetailsFragment extends DetailsFragment {
             @Override
             public void onActionClicked(Action action) {
                 if (action.getId() == ACTION_WATCH_TRAILER) {
-//                    Intent intent = new Intent(getActivity(), PlaybackActivity.class);
-//                    intent.putExtra(DetailsActivity.MOVIE, mSelectedMovie);
-//                    startActivity(intent);
-                } else if (action.getId() == ACTION_WATCH_REFRESH) {
-                    Logger.i("被点击了", "======>" + action.getLabel1());
-                    if (list == null || list.size() <= 0) {
-                        Toast.makeText(getActivity(),"刷新剧集中...",Toast.LENGTH_SHORT).show();
-                        Log.d(TAG, "刷新剧集中...11111111111");
-
-                        getVideoDetials();
+                    if (!fristUrl.equals("")) {
+                        Log.d(TAG, "续播: " + fristUrl);
+                        Intent intent = new Intent(getActivity(), SimplePlayActivity.class);
+                        intent.putExtra(DetailsActivity.URL, fristUrl);
+                        startActivity(intent);
                     }
+                } else if (action.getId() == ACTION_WATCH_REFRESH) {
+//                    Logger.i("被点击了", "======>" + action.getLabel1());
+//                    if (list == null || list.size() <= 0) {
+//                        Toast.makeText(getActivity(), "刷新剧集中...", Toast.LENGTH_SHORT).show();
+//                        Log.d(TAG, "刷新剧集中...11111111111");
+//
+//                        getVideoDetials();
+//                    }else{
+//                        Log.d(TAG, "正在加載或加載失敗...11111111111");
+//
+//                    }
                 } else {
                     Toast.makeText(getActivity(), action.toString(), Toast.LENGTH_SHORT).show();
                 }
@@ -246,8 +257,14 @@ public class VideoDetailsFragment extends DetailsFragment {
         });
         mPresenterSelector.addClassPresenter(DetailsOverviewRow.class, detailsPresenter);
     }
-
+    AlertDialog alertDialog;
     void getVideoDetials() {
+        if(alertDialog==null) {
+            alertDialog = new AlertDialog.Builder(getActivity()).setMessage("加载中...").create();
+        }else{
+            alertDialog.setMessage("重新加载中...");
+        }
+        alertDialog.show();
         switch (mSelectedMovie.getType()) {
             case Movie.TYPE_HJ:
                 getVideoUrl();
@@ -277,78 +294,110 @@ public class VideoDetailsFragment extends DetailsFragment {
         }.start();
     }
 
-    void getVideoUrl() {
-        new Thread() {
-            @Override
-            public void run() {
-                try {
-                    String url = mSelectedMovie.getVideoUrl();
-                    Document doc = Jsoups.connect(url);
-                    Logger.i(doc.toString());
-                    Elements elements = doc.select("div.tv-info-list").select("ul.clearfix");
-                    list = new ArrayList<>();
-                    for (Element e : elements.select("li")) {
-                        String id = e.select("a").select("span.num").text();
-                        String videoUrl = e.select("a").attr("href");
-                        Document dc = Jsoup.connect("https://www.hanjutv.com" + videoUrl).get();
-                        String testUrl = dc.select("iframe#playerIframe").attr("src");
-                        // SerieExtTool.getSerieExtDetail(testUrl);
-                        Logger.i(testUrl);
-                        String _path = testUrl.substring(testUrl.indexOf("path="));
-                        Logger.i(_path);
-                        Connection connect = Jsoup.connect("https://ww4.hanjutv.com/index.php?c=api&" + _path);
-                        Map<String, String> header = new HashMap<String, String>();
-                        header.put(":authority", "ww4.hanjutv.com");
-                        header.put(":method", "GET");
-                        header.put(":path", "/index.php?c=api&" + _path);
-                        header.put(":scheme", "https");
-                        header.put("accept", "application/json, text/javascript, */*; q=0.01");
-                        header.put("accept-encoding", "gzip, deflate, br");
-                        header.put("accept-language", "zh-CN,zh;q=0.9");
-                        header.put("cache-control", "no-cache");
-                        header.put("accept", "ww4.hanjutv.com");
-                        Connection data = connect.data(header);
-                        Document document = data.get();
-                        String result = document.select("body").text();
-                        JSONObject jsonObject = new JSONObject(result);
-                        JSONObject dataObject = jsonObject.getJSONObject("data");
-                        String baiduUrl = dataObject.getString("url");
-                        Logger.i(baiduUrl);
-                        list.add(new Drama(id, id, baiduUrl));
-                    }
-                    handler.sendEmptyMessage(0);
-                } catch (IOException e) {
-                    Logger.e(e.toString());
-                    e.printStackTrace();
-                }catch (Exception e) {
-                    Logger.e(e.toString());
-                    e.printStackTrace();
-                }
+    String fristUrl = "";
 
-            }
-        }.start();
+    void getVideoUrl() {
+        new ListTask().execute();
     }
 
-    Handler handler = new Handler() {
+    ArrayList<Drama> list;
+
+    public class ListTask extends AsyncTask<Void, String, ArrayList<Drama>> {
+
         @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            switch (msg.what) {
-                case 0:
-                    GridItemPresenter mGridPresenter = new GridItemPresenter();
-                    ArrayObjectAdapter gridRowAdapter = new ArrayObjectAdapter(mGridPresenter);
-                    for (Drama drama : list) {
-                        gridRowAdapter.add(drama.getId());
-                    }
-                    mAdapter.add(new ListRow(gridRowAdapter));
-                    break;
-                case 1:
-                    break;
+        protected ArrayList<Drama> doInBackground(Void... voids) {
+            try {
+                String url = mSelectedMovie.getVideoUrl();
+                Document doc = Jsoups.connect(url);
+                Logger.d(TAG, doc.toString());
+                Elements elements = doc.select("div.tv-info-list").select("ul.clearfix");
+                list = new ArrayList<>();
+                for (Element e : elements.select("li")) {
+                    String id = e.select("a").select("span.num").text();
+                    String videoUrl = e.select("a").attr("href");
+                    Document dc = Jsoup.connect("https://www.hanjutv.com" + videoUrl).get();
+                    String testUrl = dc.select("iframe#playerIframe").attr("src");
+                    Logger.i(testUrl);
+                    String _path = testUrl.substring(testUrl.indexOf("path="));
+                    Logger.i(_path);
+                    list.add(new Drama(id, id, _path));
+                }
+                fristUrl = list.get(0).getUrl();
+                return list;
+            } catch (IOException e) {
+                e.printStackTrace();
+                Logger.e(TAG, e.toString());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                Logger.e(TAG, e.toString());
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(ArrayList<Drama> list) {
+            if(list!=null){
+                alertDialog.dismiss();
+                GridItemPresenter mGridPresenter = new GridItemPresenter();
+                ArrayObjectAdapter gridRowAdapter = new ArrayObjectAdapter(mGridPresenter);
+                for (Drama drama : list) {
+                    gridRowAdapter.add(drama.getId());
+                }
+                mAdapter.add( new ListRow(gridRowAdapter));
+            }else{
+                alertDialog.setMessage("加载失败");
+                getVideoDetials();
+            }
+            super.onPostExecute(list);
+        }
+    }
+
+    public class UrlTask extends AsyncTask<String, String, String> {
+
+        @Override
+        protected String doInBackground(String... strings) {
+            try {
+                Connection connect = Jsoup.connect("https://ww4.hanjutv.com/index.php?c=api&" + strings[0]).timeout(10000);
+                Map<String, String> header = new HashMap<String, String>();
+                header.put(":authority", "ww4.hanjutv.com");
+                header.put(":method", "GET");
+                header.put(":path", "/index.php?c=api&" + strings[0]);
+                header.put(":scheme", "https");
+                header.put("accept", "application/json, text/javascript, */*; q=0.01");
+                header.put("accept-encoding", "gzip, deflate, br");
+                header.put("accept-language", "zh-CN,zh;q=0.9");
+                header.put("cache-control", "no-cache");
+                header.put("accept", "ww4.hanjutv.com");
+                Connection data = connect.data(header);
+                Document  document = data.get();
+                String result = document.select("body").text();
+                JSONObject jsonObject = new JSONObject(result);
+                JSONObject dataObject = jsonObject.getJSONObject("data");
+                String baiduUrl = dataObject.getString("url");
+                return baiduUrl;
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
 
+            return null;
         }
-    };
-    List<Drama> list = new ArrayList<>();
+
+        @Override
+        protected void onPostExecute(String s) {
+            if(s!=null){
+                Log.d(TAG,s);
+                alertDialog.dismiss();
+                Intent intent = new Intent(getActivity(), SimplePlayActivity.class);
+                intent.putExtra(DetailsActivity.URL, s);
+                startActivity(intent);
+            }
+            super.onPostExecute(s);
+        }
+    }
+
 
     class Drama {
         String id;
@@ -412,52 +461,50 @@ public class VideoDetailsFragment extends DetailsFragment {
         public void onItemClicked(Presenter.ViewHolder itemViewHolder, Object item,
                                   RowPresenter.ViewHolder rowViewHolder, Row row) {
 
-            if (item instanceof Movie) {
-                Log.d(TAG, "Item: " + item.toString());
-                Intent intent = new Intent(getActivity(), DetailsActivity.class);
-                intent.putExtra(getResources().getString(R.string.movie), mSelectedMovie);
 
-                Bundle bundle = ActivityOptionsCompat.makeSceneTransitionAnimation(
-                        getActivity(),
-                        ((ImageCardView) itemViewHolder.view).getMainImageView(),
-                        DetailsActivity.SHARED_ELEMENT_NAME).toBundle();
-                getActivity().startActivity(intent, bundle);
-            } else {
-                if (!item.toString().equals("刷新") && !item.toString().equals("续播")) {
-                    Integer integer = Integer.parseInt(item.toString());
-                    Intent intent;
-                    Drama drama = list.get(integer - 1);
-                    switch (mSelectedMovie.getType()) {
-                        case Movie.TYPE_HJ:
-                            intent = new Intent(getActivity(), SimplePlayActivity.class);
-                            intent.putExtra(DetailsActivity.URL, drama.getUrl());
-                            startActivity(intent);
-                            Log.d(TAG, "Item: " + item.toString());
-                            break;
-                        case Movie.TYPE_MJ:
-                            intent = new Intent(getActivity(), DetailsActivity.class);
-                            mSelectedMovie.setVideoUrl(drama.getUrl());
-                            intent.putExtra(getResources().getString(R.string.movie), mSelectedMovie);
+            if (!item.toString().equals("刷新") && !item.toString().equals("续播")) {
+                Integer integer = Integer.parseInt(item.toString());
+                Intent intent;
+                Drama drama = list.get(integer - 1);
+                switch (mSelectedMovie.getType()) {
+                    case Movie.TYPE_HJ:
+                        alertDialog.setMessage("正在解析视频源...");
+                        alertDialog.show();
+                        new UrlTask().execute(drama.getUrl());
+                        break;
+                    case Movie.TYPE_MJ:
+                        intent = new Intent(getActivity(), DetailsActivity.class);
+                        mSelectedMovie.setVideoUrl(drama.getUrl());
+                        intent.putExtra(getResources().getString(R.string.movie), mSelectedMovie);
 
-                            Bundle bundle = ActivityOptionsCompat.makeSceneTransitionAnimation(
-                                    getActivity(),
-                                    ((ImageCardView) itemViewHolder.view).getMainImageView(),
-                                    DetailsActivity.SHARED_ELEMENT_NAME).toBundle();
-                            getActivity().startActivity(intent, bundle);
-                            break;
-                    }
-
+                        Bundle bundle = ActivityOptionsCompat.makeSceneTransitionAnimation(
+                                getActivity(),
+                                ((ImageCardView) itemViewHolder.view).getMainImageView(),
+                                DetailsActivity.SHARED_ELEMENT_NAME).toBundle();
+                        getActivity().startActivity(intent, bundle);
+                        break;
                 }
-                if(item.toString().equals("刷新")){
-                    if (list == null || list.size() <= 0) {
-                        Log.d(TAG, "刷新剧集中...22222222222");
-                        Toast.makeText(getActivity(),"刷新剧集中...",Toast.LENGTH_SHORT).show();
-                        getVideoDetials();
-                    }
-                }
-
 
             }
+            if (item.toString().equals("刷新")) {
+                if (list == null || list.size() <= 0) {
+                    Log.d(TAG, "刷新剧集中...22222222222");
+                    Toast.makeText(getActivity(), "刷新剧集中...", Toast.LENGTH_SHORT).show();
+                    getVideoDetials();
+                } else {
+                    Log.d(TAG, "正在加載或加載失敗...11111111111");
+
+                }
+            }
+            if (item.toString().equals("续播") && !fristUrl.equals("")) {
+                Log.d(TAG, "续播: " + fristUrl);
+                Intent intent = new Intent(getActivity(), SimplePlayActivity.class);
+                intent.putExtra(DetailsActivity.URL, fristUrl);
+                startActivity(intent);
+                Log.d(TAG, "Item: " + item.toString());
+            }
+
+
         }
     }
 }
